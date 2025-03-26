@@ -17,7 +17,8 @@ process fastp {
     tuple val(sample_id), path(reads)
 
     output:
-    path "fastp_${sample_id}_logs/*"
+    path ("fastp_${sample_id}_logs/${sample_id}_1_trimmed.fastq.gz"),
+    path ("fastp_${sample_id}_logs/${sample_id}_2_trimmed.fastq.gz")
 
     script:
     """
