@@ -17,18 +17,17 @@ process fastp {
     tuple val(sample_id), path(reads)
 
     output:
-    path ("fastp_${sample_id}_logs/${sample_id}_*_trimmed.fastq.gz")
+    path ("${sample_id}_*_trimmed.fastq.gz")
 
     script:
     """
     echo "Running fastp"
-    mkdir -p fastp_${sample_id}_logs
 
     # Check the number of files in reads and run fastqc accordingly
     if [ -f "${reads[0]}" ] && [ -f "${reads[1]}" ]; then
-        fastp -i ${reads[0]} -o fastp_${sample_id}_logs/${sample_id}_1_trimmed.fastq.gz \
-        -I ${reads[1]} -O fastp_${sample_id}_logs/${sample_id}_2_trimmed.fastq.gz \
-        --html fastp_${sample_id}_logs/${sample_id}.html --json fastp_${sample_id}_logs/${sample_id}.json
+        fastp -i ${reads[0]} -o ${sample_id}_1_trimmed.fastq.gz \
+        -I ${reads[1]} -O ${sample_id}_2_trimmed.fastq.gz \
+        --html ${sample_id}.html --json ${sample_id}.json
     elif [ -f "${reads[0]}" ]; then
         fastp -i ${reads[0]} -o fastp_${sample_id}_logs/${sample_id}_trimmed.fastq.gz \
         --html fastp_${sample_id}_logs/${sample_id}.html --json fastp_${sample_id}_logs/${sample_id}.json
