@@ -14,6 +14,7 @@ log.info """\
     qsr truth vcfs  : ${params.qsrVcfs}
     output directory: ${params.outdir}
     fastqc          : ${params.fastqc}
+    fastp           : ${params.fastp}
     aligner         : ${params.aligner}
     variant caller  : ${params.variant_caller}
     bqsr            : ${params.bqsr}
@@ -29,6 +30,9 @@ if (params.index_genome) {
 }
 if (params.fastqc) {
     include { FASTQC } from './modules/FASTQC'
+}
+if (params.fastp) {
+    include { fastp } from './modules/readTrimming'
 }
 include { sortBam } from './modules/sortBam'
 include { markDuplicates } from './modules/markDuplicates'
@@ -98,12 +102,26 @@ workflow {
         FASTQC(read_pairs_ch)
     }
 
-    // Align reads to the indexed genome
-    if (params.aligner == 'bwa-mem') {
-        align_ch = alignReadsBwaMem(read_pairs_ch, indexed_genome_ch.collect())
-    } else if (params.aligner == 'bwa-aln') {
-        align_ch = alignReadsBwaAln(read_pairs_ch, indexed_genome_ch.collect())
+    // Run fastp on read pairs and create channel with trimmed reads
+    if (params.fastp) {
+        trimmed_read_pairs_ch = fastp(read_pairs_ch)
     }
+
+    // Align reads to the indexed genome - use trimmed reads where fastp has been used
+    if (params.fastp) {
+        if (params.aligner == 'bwa-mem') {
+            align_ch = alignReadsBwaMem(trimmed_read_pairs_ch, indexed_genome_ch.collect())
+        } else if (params.aligner == 'bwa-aln') {
+            align_ch = alignReadsBwaAln(trimmed_read_pairs_ch, indexed_genome_ch.collect())
+        }
+    } else {
+        if (params.aligner == 'bwa-mem') {
+            align_ch = alignReadsBwaMem(read_pairs_ch, indexed_genome_ch.collect())
+        } else if (params.aligner == 'bwa-aln') {
+            align_ch = alignReadsBwaAln(read_pairs_ch, indexed_genome_ch.collect())
+        }
+    }
+
 
     // Sort BAM files
     sort_ch = sortBam(align_ch)
@@ -251,6 +269,27 @@ workflow FASTQC_only {
 
     if (params.fastqc) {
         FASTQC(read_pairs_ch)
+    }
+}
+
+workflow fastp_only {
+    // Set channel to gather read_pairs
+    read_pairs_ch = Channel
+        .fromPath(params.samplesheet)
+        .splitCsv(sep: '\t')
+        .map { row ->
+            if (row.size() == 4) {
+                tuple(row[0], [row[1], row[2]])
+            } else if (row.size() == 3) {
+                tuple(row[0], [row[1]])
+            } else {
+                error "Unexpected row format in samplesheet: $row"
+            }
+        }
+    read_pairs_ch.view()
+
+    if (params.fastp) {
+        fastp(read_pairs_ch)
     }
 }
 
